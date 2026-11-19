@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CariBarang.ID – Barang hilang dan barang temuan</title>
+    <meta name="description" content="Cari barang yang hilang atau laporkan barang yang Anda temukan agar sampai ke pemiliknya.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="wrap bar">
+            <a class="brand" href="#top">CariBarang.ID</a>
+            <nav aria-label="Navigasi utama">
+                <a href="#daftar">Daftar laporan</a>
+                <a href="#form-section" class="nav-cta">Buat laporan</a>
+            </nav>
+        </div>
+    </header>
+
+    <main id="top" class="wrap">
+        <div id="listView">
+        <section class="intro">
+            <h1>Barang Anda hilang? Atau Anda menemukan barang orang lain?</h1>
+            <p>Cari di daftar laporan di bawah. Kalau belum ada, buat laporan baru agar pemiliknya bisa menghubungi Anda.</p>
+        </section>
+
+        <div class="layout">
+            <section id="daftar" aria-labelledby="daftar-judul">
+                <h2 id="daftar-judul" class="visually-hidden">Daftar laporan</h2>
+
+                <div class="toolbar">
+                    <label class="visually-hidden" for="searchInput">Cari laporan</label>
+                    <input type="search" id="searchInput" class="field" placeholder="Cari nama barang, kategori, atau lokasi">
+
+                    <div class="filters" role="group" aria-label="Filter status">
+                        <button type="button" class="chip is-active" data-status="" aria-pressed="true">Semua</button>
+                        <button type="button" class="chip" data-status="Hilang" aria-pressed="false">Hilang</button>
+                        <button type="button" class="chip" data-status="Temuan" aria-pressed="false">Temuan</button>
+                        <button type="button" class="chip" data-status="Selesai" aria-pressed="false">Selesai</button>
+                    </div>
+                </div>
+
+                <p id="resultCount" class="result-count" aria-live="polite"></p>
+
+                <div id="itemsContainer" class="items"></div>
+
+                <div id="emptyState" class="empty hidden">
+                    <p id="emptyText"></p>
+                    <a href="#form-section" class="link">Buat laporan baru</a>
+                </div>
+            </section>
+
+            <aside id="form-section" class="panel" aria-labelledby="form-judul">
+                <h2 id="form-judul">Buat laporan</h2>
+                <form id="reportForm" novalidate>
+                    <div class="group">
+                        <label for="status">Jenis laporan</label>
+                        <select id="status" class="field" required>
+                            <option value="Hilang">Saya kehilangan barang</option>
+                            <option value="Temuan">Saya menemukan barang</option>
+                        </select>
+                    </div>
+
+                    <div class="group">
+                        <label for="namaBarang">Nama barang</label>
+                        <input type="text" id="namaBarang" class="field" placeholder="Contoh: Dompet kulit hitam" required>
+                    </div>
+
+                    <div class="group">
+                        <label for="kategori">Kategori</label>
+                        <select id="kategori" class="field" required>
+                            <option value="Elektronik">Elektronik (HP, laptop, dll.)</option>
+                            <option value="Dokumen">Dokumen (KTP, SIM, STNK)</option>
+                            <option value="Dompet & Tas">Dompet &amp; tas</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="group">
+                            <label for="lokasi">Lokasi</label>
+                            <input type="text" id="lokasi" class="field" placeholder="Contoh: Stasiun Gambir" required>
+                        </div>
+                        <div class="group">
+                            <label for="tanggal">Tanggal</label>
+                            <input type="date" id="tanggal" class="field" required>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <label for="deskripsi">Ciri-ciri <span class="opt">(opsional)</span></label>
+                        <textarea id="deskripsi" rows="3" class="field" placeholder="Warna, merek, isi, atau tanda khusus"></textarea>
+                    </div>
+
+                    <div class="group">
+                        <label for="fotoBarang">Foto <span class="opt">(opsional)</span></label>
+                        <input type="file" id="fotoBarang" accept="image/*" class="field file">
+                        <div id="imagePreviewContainer" class="preview hidden">
+                            <img id="imagePreview" src="" alt="Pratinjau foto barang">
+                            <button type="button" id="removeImageBtn" class="btn-text">Hapus foto</button>
+                        </div>
+                    </div>
+
+                    <fieldset class="group contact">
+                        <legend>Kontak Anda</legend>
+                        <p class="hint">Nama dan kontak akan tampil di daftar agar orang lain bisa menghubungi Anda.</p>
+                        <div class="group">
+                            <label for="namaPelapor">Nama</label>
+                            <input type="text" id="namaPelapor" class="field" autocomplete="name" required>
+                        </div>
+                        <div class="group">
+                            <label for="kontak">Nomor WhatsApp atau email</label>
+                            <input type="text" id="kontak" class="field" placeholder="08123456789" autocomplete="off" required>
+                        </div>
+                    </fieldset>
+
+                    <p id="formMessage" class="message" role="status" aria-live="polite"></p>
+                    <button type="submit" class="btn">Kirim laporan</button>
+                </form>
+            </aside>
+        </div>
+        </div>
+
+        <section id="detailView" class="detail hidden" aria-live="polite"></section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <footer class="site-footer">
+        <div class="wrap">
+            <p>&copy; 2026 CariBarang.ID - Arsitektur Hybrid (GitHub Pages + Ubuntu LEMP Server)</p>
+            <p>Dikembangkan untuk Pelatihan TIK Bagi Murid (LATIKA) Provinsi Jawa Timur Tahun 2026.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
