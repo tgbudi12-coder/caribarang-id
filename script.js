@@ -1,9 +1,8 @@
 // ==========================================
-// KONFIGURASI KONEKSI API BACKEND UBUNTU
-// Ganti link di bawah dengan URL Cloudflare Tunnel aktif dari PC Ubuntu kamu
+// KONFIGURASI API BACKEND UBUNTU (Cloudflare Tunnel)
 // ==========================================
 const API_URL = "https://income-illustrations-switches-driver.trycloudflare.com/api.php";
-const STORAGE_KEY = 'caribarang_offline_db';
+const STORAGE_KEY = 'lost_items';
 
 const seed = [
     {
@@ -17,8 +16,57 @@ const seed = [
         namaBarang: 'Kunci motor Honda dan STNK', kategori: 'Dokumen',
         lokasi: 'Fakultas Teknik Kampus', tanggal: '2026-06-02', milikSaya: false,
         deskripsi: 'Ditemukan di atas meja kantin area pojok.', foto: 'images-(1).jfif'
+    },
+    {
+        id: 3, status: 'Hilang', namaPelapor: 'Dewi Lestari', kontak: '087711223344',
+        namaBarang: 'HP Samsung hitam', kategori: 'Elektronik',
+        lokasi: 'Terminal Giwangan, Yogyakarta', tanggal: '2026-05-28', milikSaya: false,
+        deskripsi: 'Casing biru tua, ada retak kecil di pojok kiri atas.', foto: 'images-(2).jfif',
+        selesai: true, tanggalSelesai: '2026-06-04'
     }
 ];
+
+// ---------- Ambil Data dari Server MySQL atau LocalStorage ----------
+async function loadReports() {
+    try {
+        const response = await fetch(API_URL);
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data)) {
+                updateServerStatus(true);
+                return data.length ? data : seed;
+            }
+        }
+    } catch (err) {
+        console.warn("Server offline, menggunakan penyimpanan lokal.");
+    }
+
+    updateServerStatus(false);
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (Array.isArray(saved) && saved.length) return saved;
+    } catch (err) { /* data rusak atau storage tidak tersedia */ }
+    return seed;
+}
+
+// Indikator Status Server di Navbar
+function updateServerStatus(isOnline) {
+    let indicator = document.getElementById('serverStatusBadge');
+    if (!indicator) {
+        const brandNav = document.querySelector('.brand');
+        if (brandNav) {
+            indicator = document.createElement('span');
+            indicator.id = 'serverStatusBadge';
+            indicator.style.cssText = "margin-left: 10px; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;";
+            brandNav.parentNode.appendChild(indicator);
+        }
+    }
+    if (indicator) {
+        indicator.textContent = isOnline ? "🟢 Server MySQL Aktif" : "🟠 Mode Offline";
+        indicator.style.background = isOnline ? "#e8f2ec" : "#fef3c7";
+        indicator.style.color = isOnline ? "#1c6e45" : "#b45309";
+    }
+}
 
 let reports = [];
 let activeStatus = '';
@@ -36,58 +84,17 @@ const fotoInput = $('fotoBarang');
 const previewBox = $('imagePreviewContainer');
 const previewImg = $('imagePreview');
 
+// Inisialisasi data asynchronously
+loadReports().then(data => {
+    reports = data;
+    render();
+    route();
+});
+
 /* Tanggal tidak boleh di masa depan */
 const today = new Date();
 if ($('tanggal')) {
     $('tanggal').max = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-
-/* ---------- Ambil Data dari Server MySQL / Fallback ---------- */
-async function loadReports() {
-    try {
-        const response = await fetch(API_URL);
-        if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data)) {
-                reports = data;
-                // Indikator server aktif jika berhasil ambil dari MySQL
-                updateServerStatus(true);
-                render();
-                return;
-            }
-        }
-    } catch (err) {
-        console.warn("Gagal terhubung ke server MySQL, menggunakan data lokal.");
-    }
-    
-    // Fallback ke localStorage jika server offline
-    updateServerStatus(false);
-    try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        reports = Array.isArray(saved) && saved.length ? saved : seed;
-    } catch (e) {
-        reports = seed;
-    }
-    render();
-}
-
-// Indikator Status Server di Navbar (Opsional)
-function updateServerStatus(isOnline) {
-    let indicator = $('serverStatusBadge');
-    if (!indicator) {
-        const brandNav = document.querySelector('.brand');
-        if (brandNav) {
-            indicator = document.createElement('span');
-            indicator.id = 'serverStatusBadge';
-            indicator.style.cssText = "margin-left: 10px; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;";
-            brandNav.parentNode.appendChild(indicator);
-        }
-    }
-    if (indicator) {
-        indicator.textContent = isOnline ? "🟢 Server MySQL Aktif" : "🟠 Mode Offline";
-        indicator.style.background = isOnline ? "#e8f2ec" : "#fef3c7";
-        indicator.style.color = isOnline ? "#1c6e45" : "#b45309";
-    }
 }
 
 /* ---------- Util ---------- */
@@ -167,6 +174,15 @@ function statusLabel(item) {
 }
 const statusClass = item => item.selesai ? 'selesai' : (item.status ? item.status.toLowerCase() : '');
 
+function save() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
 function toast(text) {
     const el = $('toast');
     if (!el) return;
@@ -181,7 +197,7 @@ async function copyText(text, okMsg) {
         await navigator.clipboard.writeText(text);
         toast(okMsg);
     } catch (err) {
-        toast('Tidak bisa menyalin otomatis.');
+        toast('Tidak bisa menyalin otomatis. Salin dari kolom alamat browser.');
     }
 }
 
@@ -195,14 +211,18 @@ function render() {
             return true;
         })
         .filter(r => !q || [r.namaBarang, r.lokasi, r.kategori, r.deskripsi].some(v => (v || '').toLowerCase().includes(q)))
-        .sort((a, b) => (!!b.id - !!a.id));
+        .sort((a, b) => (!!a.selesai - !!b.selesai) || (b.tanggal || '').localeCompare(a.tanggal || '') || b.id - a.id);
 
     if (resultCount) resultCount.textContent = rows.length ? `${rows.length} laporan` : '';
     if (list) list.innerHTML = '';
     if (emptyState) emptyState.classList.toggle('hidden', rows.length > 0);
 
     if (!rows.length) {
-        if (emptyText) emptyText.textContent = (q || activeStatus) ? 'Tidak ada laporan yang cocok.' : 'Belum ada laporan.';
+        if (emptyText) {
+            emptyText.textContent = (q || activeStatus)
+                ? 'Tidak ada laporan yang cocok. Coba kata kunci lain atau hapus filter.'
+                : 'Belum ada laporan.';
+        }
         return;
     }
 
@@ -241,10 +261,178 @@ if (list) {
     });
 }
 
-/* ---------- Halaman detail & Form Submit ---------- */
+/* ---------- Halaman detail ---------- */
 const listView = $('listView');
 const detailView = $('detailView');
+let confirming = null; // 'selesai' | 'buka' | 'hapus'
 
+function renderDetail(item) {
+    const c = contactLink(item);
+    const hilang = item.status === 'Hilang';
+    const doneTitle = hilang ? 'Barang ini sudah ditemukan.' : 'Barang ini sudah dikembalikan ke pemiliknya.';
+    const doneAction = hilang ? 'Tandai sudah ditemukan' : 'Tandai sudah dikembalikan';
+
+    if (!detailView) return;
+    detailView.classList.toggle('is-done', !!item.selesai);
+    detailView.innerHTML = `
+        <a class="back" href="#daftar">Kembali ke daftar</a>
+        <div class="detail-grid">
+            <div class="detail-photo">
+                ${item.foto ? `<img src="${item.foto}" alt="Foto ${escapeHTML(item.namaBarang)}">` : 'Tidak ada foto'}
+            </div>
+            <div>
+                <div class="item-head">
+                    <span class="status ${statusClass(item)}">${statusLabel(item)}</span>
+                    <span>Dilaporkan ${formatDate(item.tanggal)}</span>
+                </div>
+                <h1>${escapeHTML(item.namaBarang)}</h1>
+
+                ${item.selesai ? `
+                <div class="done-banner">
+                    <strong>Laporan selesai</strong>
+                    ${doneTitle}${item.tanggalSelesai ? ' Ditandai selesai pada ' + formatDate(item.tanggalSelesai) + '.' : ''}
+                </div>` : ''}
+
+                <dl class="facts">
+                    <dt>Kategori</dt><dd>${escapeHTML(item.kategori)}</dd>
+                    <dt>${hilang ? 'Lokasi hilang' : 'Lokasi ditemukan'}</dt><dd>${escapeHTML(item.lokasi)}</dd>
+                    <dt>${hilang ? 'Tanggal hilang' : 'Tanggal ditemukan'}</dt><dd>${formatDate(item.tanggal)}</dd>
+                    <dt>Pelapor</dt><dd>${escapeHTML(item.namaPelapor)}</dd>
+                </dl>
+
+                <h2>Ciri-ciri</h2>
+                <p class="detail-desc">${escapeHTML(item.deskripsi || 'Pelapor tidak menambahkan ciri-ciri.')}</p>
+
+                ${item.selesai ? '' : `
+                <h2>${hilang ? 'Punya informasi tentang barang ini?' : 'Ini barang Anda?'}</h2>
+                <div class="actions">
+                    <a class="btn" href="${c.href}" target="_blank" rel="noopener noreferrer">${c.label}</a>
+                    <button type="button" class="btn-ghost" data-action="copy-contact">Salin kontak</button>
+                </div>`}
+                <div class="actions" style="margin-top:0.5rem">
+                    <button type="button" class="btn-ghost" data-action="copy-link">Salin tautan laporan</button>
+                </div>
+
+                ${item.milikSaya === false ? '' : `
+                <div class="owner">
+                    <h2>Kelola laporan Anda</h2>
+                    <p>${item.selesai
+                        ? 'Barang ini sudah ditandai selesai. Jika ternyata belum, Anda bisa membuka kembali laporannya.'
+                        : (hilang ? 'Sudah menemukan barang Anda? Tandai laporan ini agar orang lain tidak perlu menghubungi Anda lagi.'
+                                  : 'Sudah menyerahkan barang ke pemiliknya? Tandai laporan ini agar tidak dicari lagi.')}</p>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost" data-action="ask" data-kind="${item.selesai ? 'buka' : 'selesai'}">${item.selesai ? 'Buka kembali laporan' : doneAction}</button>
+                        <button type="button" class="btn-ghost btn-danger" data-action="ask" data-kind="hapus">Hapus laporan</button>
+                    </div>
+                    ${confirming ? `
+                    <div class="confirm">
+                        <p>${confirming === 'hapus' ? 'Hapus laporan ini secara permanen?'
+                            : confirming === 'buka' ? 'Buka kembali laporan ini?' : 'Tandai laporan ini selesai?'}</p>
+                        <div class="actions">
+                            <button type="button" class="btn" data-action="confirm">Ya, lanjutkan</button>
+                            <button type="button" class="btn-ghost" data-action="cancel">Batal</button>
+                        </div>
+                    </div>` : ''}
+                </div>`}
+            </div>
+        </div>`;
+}
+
+if (detailView) {
+    detailView.addEventListener('click', e => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const item = reports.find(r => r.id === currentId);
+        if (!item) return;
+        const action = btn.dataset.action;
+
+        if (action === 'copy-link') return copyText(location.href, 'Tautan disalin');
+        if (action === 'copy-contact') return copyText(item.kontak, 'Kontak disalin');
+        if (action === 'ask') { confirming = btn.dataset.kind; return renderDetail(item); }
+        if (action === 'cancel') { confirming = null; return renderDetail(item); }
+
+        if (action === 'confirm') {
+            const kind = confirming;
+            confirming = null;
+            if (kind === 'hapus') {
+                reports = reports.filter(r => r.id !== item.id);
+                save();
+                toast('Laporan dihapus');
+                location.hash = '#daftar';
+                return;
+            }
+            const prev = { selesai: item.selesai, tanggalSelesai: item.tanggalSelesai };
+            item.selesai = kind === 'selesai';
+            item.tanggalSelesai = item.selesai ? new Date().toISOString().slice(0, 10) : '';
+            if (!save()) {
+                Object.assign(item, prev);
+                toast('Perubahan gagal disimpan.');
+            } else {
+                toast(item.selesai ? 'Laporan ditandai selesai' : 'Laporan dibuka kembali');
+            }
+            renderDetail(item);
+            render();
+        }
+    });
+}
+
+let currentId = null;
+
+function route() {
+    const m = location.hash.match(/^#\/barang\/(\d+)$/);
+    if (!m) {
+        currentId = null;
+        confirming = null;
+        if (detailView) detailView.classList.add('hidden');
+        if (listView) listView.classList.remove('hidden');
+        document.title = 'CariBarang.ID – Barang hilang dan barang temuan';
+        render();
+        const target = location.hash.length > 1 && document.getElementById(location.hash.slice(1));
+        if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
+        return;
+    }
+
+    const id = Number(m[1]);
+    if (id !== currentId) confirming = null;
+    currentId = id;
+    const item = reports.find(r => r.id === id);
+    if (listView) listView.classList.add('hidden');
+    if (detailView) detailView.classList.remove('hidden');
+    window.scrollTo(0, 0);
+
+    if (!item) {
+        if (detailView) {
+            detailView.classList.remove('is-done');
+            detailView.innerHTML = `<a class="back" href="#daftar">Kembali ke daftar</a>
+                <h1>Laporan tidak ditemukan</h1>
+                <p class="detail-desc">Laporan ini mungkin sudah dihapus.</p>`;
+        }
+        document.title = 'Laporan tidak ditemukan – CariBarang.ID';
+        return;
+    }
+    document.title = `${item.namaBarang} – CariBarang.ID`;
+    renderDetail(item);
+}
+window.addEventListener('hashchange', route);
+
+/* ---------- Filter & pencarian ---------- */
+if ($('searchInput')) {
+    $('searchInput').addEventListener('input', e => { query = e.target.value; render(); });
+}
+
+document.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+        activeStatus = btn.dataset.status;
+        document.querySelectorAll('.chip').forEach(b => {
+            const on = b === btn;
+            b.classList.toggle('is-active', on);
+            b.setAttribute('aria-pressed', on);
+        });
+        render();
+    });
+});
+
+/* ---------- Form ---------- */
 function setMessage(text, type = '') {
     if (!message) return;
     message.textContent = text;
@@ -268,13 +456,17 @@ if (form) {
         const missing = required.filter(id => !val(id));
 
         if (missing.length) {
-            missing.forEach(id => { if($(id)) $(id).classList.add('invalid'); });
+            missing.forEach(id => { if ($(id)) $(id).classList.add('invalid'); });
+            if ($(missing[0])) $(missing[0]).focus();
             setMessage('Lengkapi kolom yang ditandai.', 'error');
             return;
         }
         if (!isValidContact(val('kontak'))) {
-            if($('kontak')) $('kontak').classList.add('invalid');
-            setMessage('Isi nomor WhatsApp atau email yang valid.', 'error');
+            if ($('kontak')) {
+                $('kontak').classList.add('invalid');
+                $('kontak').focus();
+            }
+            setMessage('Isi nomor WhatsApp (9–15 digit) atau alamat email yang valid.', 'error');
             return;
         }
 
@@ -287,7 +479,10 @@ if (form) {
             lokasi: val('lokasi'),
             tanggal: val('tanggal'),
             deskripsi: val('deskripsi'),
-            foto: currentImage
+            foto: currentImage,
+            milikSaya: true,
+            selesai: false,
+            tanggalSelesai: ''
         };
 
         try {
@@ -300,16 +495,26 @@ if (form) {
                 form.reset();
                 clearImage();
                 setMessage('Laporan berhasil dikirim ke server MySQL!', 'ok');
-                loadReports(); // Muat ulang data dari server
+                // Muat ulang daftar laporan dari database
+                reports = await loadReports();
+                render();
                 return;
             }
         } catch (err) {
-            console.error("Gagal mengirim ke server:", err);
+            console.warn("Gagal mengirim ke server MySQL, menyimpan ke mode offline.");
         }
 
-        setMessage('Gagal terhubung ke server database.', 'error');
+        // Fallback simpan lokal jika gagal ke server
+        newReport.id = Date.now();
+        reports.push(newReport);
+        if (!save()) {
+            reports.pop();
+            setMessage('Laporan tidak tersimpan karena penyimpanan penuh.', 'error');
+            return;
+        }
+        form.reset();
+        clearImage();
+        setMessage('Laporan terkirim (Mode Offline).', 'ok');
+        render();
     });
 }
-
-// Inisialisasi awal memuat data
-loadReports();
